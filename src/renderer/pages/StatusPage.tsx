@@ -34,7 +34,7 @@ export function StatusPage(props: {
             <p>{props.needsUpgrade ? 'App 与后台服务版本不一致。升级会先备份现有服务，验证新版本正常后再完成替换。' : '首次安装会弹出 macOS 管理员授权。安装后后台服务随系统启动，窗口不会自动弹出。'}</p>
           </div>
           <button className="button button-primary" disabled={props.busy} onClick={props.onInstall}>
-            <Download size={16} />{props.needsUpgrade ? '升级后台服务' : '安装后台服务'}
+            <Download size={16} />{props.busy ? (props.needsUpgrade ? '正在升级后台服务…' : '正在安装后台服务…') : (props.needsUpgrade ? '升级后台服务' : '安装后台服务')}
           </button>
         </section>
       ) : (

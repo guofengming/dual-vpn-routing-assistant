@@ -211,7 +211,7 @@ App 只移除旧 Skill 安装到 `/Library/LaunchDaemons`、`/usr/local/libexec`
 
 ## 15. 当前验证范围
 
-版本 `0.1.0` 已完成自动化测试、Electron 窗口测试、Apple 芯片本机打包检查、DMG 完整性检查和 Universal 二进制架构检查。
+版本 `0.1.1` 已完成自动化测试、Electron 窗口测试、Apple 芯片本机打包检查、DMG 完整性检查和 Universal 二进制架构检查。
 
 以下项目仍应在正式推广前由获授权的测试设备完成：
 

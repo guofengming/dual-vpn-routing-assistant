@@ -13,6 +13,37 @@ typeset -gr INSTALL_SERVICE_PLIST="/Library/LaunchDaemons/${APP_ID}.plist"
 typeset -gr INSTALL_DAEMON_DIR="${SYSTEM_ROOT}/daemon"
 typeset -gr INSTALL_BACKUP_DIR="${STATE_ROOT}/install-backup"
 typeset -g INSTALL_STARTED=false
+typeset -g INSTALL_FAILURE_CODE="preflight_failed"
+typeset -g INSTALL_FAILURE_MESSAGE="安装前检查失败，未更改后台服务"
+
+set_install_stage() {
+  INSTALL_FAILURE_CODE="$1"
+  INSTALL_FAILURE_MESSAGE="$2"
+  safe_log info "install stage=${INSTALL_FAILURE_CODE}"
+}
+
+initialize_install_log() {
+  if fixture_mode_enabled; then
+    safe_log info "install requested"
+    return 0
+  fi
+  /usr/bin/touch "$LOG_FILE" || return 1
+  /usr/sbin/chown root:wheel "$LOG_FILE" || return 1
+  /bin/chmod 0644 "$LOG_FILE" || return 1
+  safe_log info "install requested"
+}
+
+report_install_failure() {
+  safe_log error "install failed stage=${INSTALL_FAILURE_CODE}" || true
+  print -r -- "{\"ok\":false,\"action\":\"install\",\"message\":\"$(json_escape "$INSTALL_FAILURE_MESSAGE")\",\"daemonVersion\":null,\"errorCode\":\"${INSTALL_FAILURE_CODE}\"}"
+}
+
+mark_rollback_failure() {
+  local original_stage="$INSTALL_FAILURE_CODE"
+  safe_log error "install rollback failed original_stage=${original_stage}" || true
+  INSTALL_FAILURE_CODE="rollback_failed"
+  INSTALL_FAILURE_MESSAGE="安装失败且自动回滚未完成，网络或后台服务可能仍需恢复；请勿重复操作，并导出诊断信息"
+}
 
 test_fail_step() {
   fixture_mode_enabled || return 1
@@ -200,38 +231,90 @@ rollback_full_installation() {
   rollback_legacy_migration "$legacy_backup_dir"
 }
 
+rollback_legacy_after_failure() {
+  local legacy_backup_dir="$1"
+  rollback_legacy_migration "$legacy_backup_dir" || mark_rollback_failure
+  return 0
+}
+
+rollback_full_after_failure() {
+  local legacy_backup_dir="$1"
+  rollback_full_installation "$legacy_backup_dir" || mark_rollback_failure
+  return 0
+}
+
 install_service() {
   fixture_mode_enabled || (( EUID == 0 )) || { print -u2 "administrator privileges required"; return 77; }
+
+  set_install_stage log_initialization_failed "无法创建安装日志，后台服务未安装"
+  initialize_install_log || return 1
+
+  set_install_stage backup_failed "无法备份现有后台服务，未进行任何替换"
   backup_previous_service || return 1
   local legacy_backup_dir="${INSTALL_BACKUP_DIR}/legacy"
-  prepare_legacy_migration "$legacy_backup_dir" || return 1
-  snapshot_network_for_install || { rollback_legacy_migration "$legacy_backup_dir"; return 1; }
+
+  set_install_stage legacy_migration_failed "旧版 Skill 迁移未完成，原服务和网络配置已保留"
+  prepare_legacy_migration "$legacy_backup_dir"
+  local migration_result=$?
+  if (( migration_result != 0 )); then
+    (( migration_result == 2 )) && mark_rollback_failure
+    return 1
+  fi
+
+  set_install_stage network_snapshot_failed "无法保存当前网络快照，未安装后台服务"
+  snapshot_network_for_install || { rollback_legacy_after_failure "$legacy_backup_dir"; return 1; }
   INSTALL_STARTED=true
   # Nothing from the current service has been replaced yet. If it cannot be
   # stopped, leave it untouched and only restore the prepared legacy service.
-  stop_installed_service || { rollback_legacy_migration "$legacy_backup_dir"; return 1; }
-  install_files || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  create_user_ipc_directory || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  bootstrap_installed_service || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  verify_installed_service || { rollback_full_installation "$legacy_backup_dir"; return 1; }
+
+  set_install_stage service_stop_failed "无法安全停止现有后台服务，未进行替换"
+  stop_installed_service || { rollback_legacy_after_failure "$legacy_backup_dir"; return 1; }
+
+  set_install_stage service_files_failed "安装服务文件失败，原有网络配置已保留"
+  install_files || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+
+  set_install_stage ipc_setup_failed "创建本地控制目录失败，系统已尝试恢复原配置"
+  create_user_ipc_directory || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+
+  set_install_stage service_bootstrap_failed "启动后台服务失败，系统已尝试恢复原配置"
+  bootstrap_installed_service || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+
+  set_install_stage service_verification_failed "后台服务启动后未通过验证，系统已尝试恢复原配置"
+  verify_installed_service || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
   local daemon_version
-  daemon_version="$(/bin/cat "${INSTALL_SOURCE_DIR}/VERSION")" || { rollback_full_installation "$legacy_backup_dir"; return 1; }
+
+  set_install_stage version_read_failed "读取后台服务版本失败，系统已尝试恢复原配置"
+  daemon_version="$(/bin/cat "${INSTALL_SOURCE_DIR}/VERSION")" || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
   if fixture_mode_enabled; then
-    commit_legacy_migration || { rollback_full_installation "$legacy_backup_dir"; return 1; }
+    set_install_stage legacy_commit_failed "旧版 Skill 清理未完成，系统已尝试恢复原配置"
+    commit_legacy_migration || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
     print -r -- "operation=installation-complete"
     return 0
   fi
-  /usr/bin/printf '%s\n' "$daemon_version" >| "${STATE_ROOT}/version" || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  /usr/sbin/chown root:wheel "${STATE_ROOT}/version" || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  /bin/chmod 0644 "${STATE_ROOT}/version" || { rollback_full_installation "$legacy_backup_dir"; return 1; }
-  commit_legacy_migration || { rollback_full_installation "$legacy_backup_dir"; return 1; }
+
+  set_install_stage version_record_failed "记录后台服务版本失败，系统已尝试恢复原配置"
+  /usr/bin/printf '%s\n' "$daemon_version" >| "${STATE_ROOT}/version" || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+  /usr/sbin/chown root:wheel "${STATE_ROOT}/version" || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+  /bin/chmod 0644 "${STATE_ROOT}/version" || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
+
+  set_install_stage legacy_commit_failed "旧版 Skill 清理未完成，系统已尝试恢复原配置"
+  commit_legacy_migration || { rollback_full_after_failure "$legacy_backup_dir"; return 1; }
   /bin/rm -rf "$INSTALL_BACKUP_DIR" || safe_log warn "installation backup could not be removed"
+  safe_log info "install completed version=${daemon_version}"
   print -r -- "{\"ok\":true,\"action\":\"install\",\"message\":\"后台服务已安装\",\"daemonVersion\":\"${daemon_version}\"}"
 }
 
-if [[ "${1:-}" == --test-plan ]]; then
-  run_test_install_plan
-  exit $?
-fi
+run_install_entrypoint() {
+  if [[ "${1:-}" == --test-plan ]]; then
+    run_test_install_plan
+  else
+    install_service
+  fi
+  local result=$?
+  if (( result != 0 )); then
+    report_install_failure
+  fi
+  return $result
+}
 
-install_service
+run_install_entrypoint "$@"

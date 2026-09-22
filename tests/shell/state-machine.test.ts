@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DaemonStatusSchema } from '../../src/shared/protocol'
 import { runDaemonScript } from '../helpers/run-daemon-script'
+
+const daemonVersion = readFileSync(path.join(process.cwd(), 'resources/daemon/VERSION'), 'utf8').trim()
 
 async function transition(current: string, event: string): Promise<string> {
   const result = await runDaemonScript(
@@ -172,7 +176,7 @@ describe('recovery state machine', () => {
     const line = result.stdout.split('\n').find((value) => value.startsWith('status_json='))
     const parsed = DaemonStatusSchema.parse(JSON.parse(line?.slice('status_json='.length) ?? ''))
     expect(parsed.phase).toBe('ACTIVE')
-    expect(parsed.daemonVersion).toBe('0.1.0')
+    expect(parsed.daemonVersion).toBe(daemonVersion)
     expect(parsed.events).toMatchObject([{ code: 'phase_active', level: 'info' }])
   })
 })

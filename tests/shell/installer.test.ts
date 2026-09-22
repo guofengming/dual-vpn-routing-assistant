@@ -41,6 +41,25 @@ describe('privileged service transaction', () => {
     expect(result.stdout).not.toContain('operation=install-service-files')
   })
 
+  it('reports an incomplete rollback when legacy restoration and restart both fail', async () => {
+    const result = await runDaemonScript(
+      'install-helper.sh',
+      ['--test-plan'],
+      'legacy-rollback-failure'
+    )
+
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stdout).toContain('operation=legacy-restore-network')
+    expect(result.stdout).toContain('operation=legacy-restart-service')
+    const failureLine = result.stdout.trim().split('\n').findLast((line) => line.startsWith('{'))
+    expect(JSON.parse(failureLine ?? '{}')).toMatchObject({
+      ok: false,
+      action: 'install',
+      errorCode: 'rollback_failed',
+      daemonVersion: null
+    })
+  })
+
   it('restores route and DNS snapshots after a failed installation', async () => {
     const result = await runDaemonScript('install-helper.sh', ['--test-plan'], 'installer-failure')
 
@@ -97,6 +116,13 @@ describe('privileged service transaction', () => {
     expect(result.stdout).not.toContain('operation=restore-previous-service')
     expect(result.stdout).not.toContain('operation=legacy-restart-service')
     expect(result.stdout).not.toContain('operation=legacy-remove-files')
+    const failureLine = result.stdout.trim().split('\n').findLast((line) => line.startsWith('{'))
+    expect(JSON.parse(failureLine ?? '{}')).toMatchObject({
+      ok: false,
+      action: 'install',
+      errorCode: 'rollback_failed',
+      daemonVersion: null
+    })
   })
 
   it('keeps the recovery daemon and backups when network rollback is incomplete', async () => {
@@ -113,6 +139,13 @@ describe('privileged service transaction', () => {
     expect(result.stdout).not.toContain('operation=restore-previous-service')
     expect(result.stdout).not.toContain('operation=legacy-restart-service')
     expect(result.stdout).not.toContain('operation=legacy-remove-files')
+    const failureLine = result.stdout.trim().split('\n').findLast((line) => line.startsWith('{'))
+    expect(JSON.parse(failureLine ?? '{}')).toMatchObject({
+      ok: false,
+      action: 'install',
+      errorCode: 'rollback_failed',
+      daemonVersion: null
+    })
   })
 
   it('removes a fresh daemon status after a verified clean installation rollback', async () => {
@@ -140,6 +173,14 @@ describe('privileged service transaction', () => {
     expect(result.stdout).toContain('operation=legacy-restart-service')
     expect(result.stdout).not.toContain('operation=legacy-remove-files')
     expect(result.stdout).not.toContain('operation=bootstrap-new')
+
+    const failureLine = result.stdout.trim().split('\n').findLast((line) => line.startsWith('{'))
+    expect(JSON.parse(failureLine ?? '{}')).toMatchObject({
+      ok: false,
+      action: 'install',
+      errorCode: 'service_files_failed',
+      daemonVersion: null
+    })
   })
 
   it('aborts and rolls back when an existing daemon cannot be booted out', async () => {

@@ -1,4 +1,4 @@
-import { Activity, Gauge, ScrollText, Settings, Shield, Wifi } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, Gauge, ScrollText, Settings, Shield, Wifi } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { DaemonStatus } from '../shared/protocol'
 import { DiagnosticsPage } from './pages/DiagnosticsPage'
@@ -6,13 +6,14 @@ import { SettingsPage } from './pages/SettingsPage'
 import { StatusPage } from './pages/StatusPage'
 
 type Page = 'status' | 'diagnostics' | 'settings'
+type OperationFeedback = { tone: 'success' | 'error'; message: string }
 
 export function App() {
   const [page, setPage] = useState<Page>('status')
   const [status, setStatus] = useState<DaemonStatus | null>(null)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<OperationFeedback | null>(null)
 
   const refresh = useCallback(async () => {
     const next = await window.dualVpn.getStatus()
@@ -35,19 +36,23 @@ export function App() {
     }
   }, [refresh])
 
-  const run = async (action: () => Promise<unknown>, success?: string) => {
+  const run = async (action: () => Promise<unknown>, success?: string, failure = '操作未完成，请查看诊断信息') => {
     setBusy(true)
-    setToast(null)
+    setFeedback(null)
     try {
       const result = await action()
       if (typeof result === 'object' && result !== null && 'ok' in result) {
         const privileged = result as { ok: boolean; message: string }
-        if (!privileged.ok) throw new Error(privileged.message)
-        setToast(privileged.message)
-      } else if (success) setToast(success)
+        if (!privileged.ok) {
+          setFeedback({ tone: 'error', message: privileged.message })
+          await refresh()
+          return
+        }
+        setFeedback({ tone: 'success', message: privileged.message })
+      } else if (success) setFeedback({ tone: 'success', message: success })
       await refresh()
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : '操作未完成，请查看诊断信息')
+    } catch {
+      setFeedback({ tone: 'error', message: failure })
     } finally {
       setBusy(false)
     }
@@ -82,11 +87,20 @@ export function App() {
           <div className="live-clock"><span className="pulse-dot" /><div><small>LAST SYNC</small><strong>{new Date(status.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}</strong></div></div>
         </header>
         <div className="page-content">
-          {page === 'status' && <StatusPage status={status} busy={busy} needsUpgrade={status.phase !== 'UNINSTALLED' && appVersion !== null && status.daemonVersion !== appVersion} onRepair={() => void run(() => window.dualVpn.repairNow(), '检测请求已发送')} onTogglePause={() => void run(() => window.dualVpn.setPaused(!(status.paused || status.phase === 'PAUSED')))} onInstall={() => void run(() => window.dualVpn.installService())} />}
-          {page === 'diagnostics' && <DiagnosticsPage status={status} onExport={() => void run(() => window.dualVpn.exportDiagnostics(), '诊断文件已导出')} />}
-          {page === 'settings' && <SettingsPage status={status} busy={busy} onAutoEnableChange={(value) => void run(() => window.dualVpn.setAutoEnableAtBoot(value))} onLogLevelChange={(value) => void run(() => window.dualVpn.setLogLevel(value))} onUninstall={() => void run(() => window.dualVpn.uninstallService(), '后台服务已卸载')} />}
+          {feedback && (
+            <div className={`operation-feedback operation-feedback-${feedback.tone}`} role={feedback.tone === 'error' ? 'alert' : 'status'}>
+              {feedback.tone === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+              <div>
+                <strong>{feedback.tone === 'error' ? '操作未完成' : '操作已完成'}</strong>
+                <span>{feedback.message}</span>
+                {feedback.tone === 'error' && <small>错误信息会保留在这里；可前往“诊断日志”页面查看当前状态。</small>}
+              </div>
+            </div>
+          )}
+          {page === 'status' && <StatusPage status={status} busy={busy} needsUpgrade={status.phase !== 'UNINSTALLED' && appVersion !== null && status.daemonVersion !== appVersion} onRepair={() => void run(() => window.dualVpn.repairNow(), '检测请求已发送')} onTogglePause={() => void run(() => window.dualVpn.setPaused(!(status.paused || status.phase === 'PAUSED')))} onInstall={() => void run(() => window.dualVpn.installService(), undefined, '安装请求未完成，请查看诊断信息')} />}
+          {page === 'diagnostics' && <DiagnosticsPage status={status} onExport={() => void run(() => window.dualVpn.exportDiagnostics(), '诊断文件已导出', '诊断文件导出失败，请重新选择保存位置')} />}
+          {page === 'settings' && <SettingsPage status={status} busy={busy} onAutoEnableChange={(value) => void run(() => window.dualVpn.setAutoEnableAtBoot(value))} onLogLevelChange={(value) => void run(() => window.dualVpn.setLogLevel(value))} onUninstall={() => void run(() => window.dualVpn.uninstallService(), '后台服务已卸载', '卸载请求未完成，请查看诊断信息')} />}
         </div>
-        {toast && <div className="toast" role="status">{toast}</div>}
       </main>
     </div>
   )

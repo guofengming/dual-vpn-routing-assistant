@@ -230,6 +230,7 @@ rollback_legacy_migration() {
   [[ "$LEGACY_MIGRATION_PRESENT" == true ]] || return 0
   if fixture_mode_enabled; then
     print -r -- "operation=legacy-restart-service"
+    read_fixture fail-step.txt 2>/dev/null | /usr/bin/grep -Fxq legacy-rollback && return 1
     return 0
   fi
   restore_legacy_assets "$backup_dir" || return 1
@@ -246,8 +247,8 @@ prepare_legacy_migration() {
     print -r -- "operation=legacy-cleanup-bundled"
     print -r -- "operation=legacy-bootout"
     print -r -- "operation=legacy-restore-network"
-    if [[ "$(read_fixture fail-step.txt 2>/dev/null || true)" == legacy-restore ]]; then
-      rollback_legacy_migration "$backup_dir"
+    if read_fixture fail-step.txt 2>/dev/null | /usr/bin/grep -Fxq legacy-restore; then
+      rollback_legacy_migration "$backup_dir" || return 2
       return 1
     fi
     return 0
@@ -259,12 +260,15 @@ prepare_legacy_migration() {
   backup_legacy_assets "$backup_dir" || return 1
   if [[ "$LEGACY_MIGRATION_WAS_LOADED" == true ]]; then
     if ! /bin/launchctl bootout "system/${LEGACY_LABEL}" >/dev/null 2>&1; then
-      rollback_legacy_migration "$backup_dir" || true
+      rollback_legacy_migration "$backup_dir" || return 2
       return 1
     fi
   fi
   if ! legacy_restore_routes || ! legacy_restore_dns; then
-    rollback_legacy_migration "$backup_dir" || safe_log error "legacy service rollback failed"
+    if ! rollback_legacy_migration "$backup_dir"; then
+      safe_log error "legacy service rollback failed"
+      return 2
+    fi
     return 1
   fi
 }

@@ -1,10 +1,12 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { DaemonPhase, DaemonStatus } from '../../src/shared/protocol'
 
 const projectRoot = path.resolve(import.meta.dirname, '../..')
+const daemonVersion = readFileSync(path.join(projectRoot, 'resources/daemon/VERSION'), 'utf8').trim()
 
 function fixtureStatus(phase: DaemonPhase): DaemonStatus {
   const active = phase === 'ACTIVE'
@@ -34,7 +36,7 @@ function fixtureStatus(phase: DaemonPhase): DaemonStatus {
     } : null,
     autoEnableAtBoot: true,
     paused: phase === 'PAUSED',
-    daemonVersion: '0.1.0',
+    daemonVersion,
     processedRequestId: null,
     events: []
   }

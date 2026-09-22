@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PrivilegedResult } from '../../src/main/privileged-action'
 import type { DaemonStatus } from '../../src/shared/protocol'
 import { App } from '../../src/renderer/App'
 
@@ -48,8 +49,8 @@ function mockApi(initial: DaemonStatus) {
     setPaused: vi.fn(async () => undefined),
     setAutoEnableAtBoot: vi.fn(async () => undefined),
     setLogLevel: vi.fn(async () => undefined),
-    installService: vi.fn(async () => ({ ok: true, action: 'install' as const, message: 'ok', daemonVersion: '0.1.0' as string | null })),
-    uninstallService: vi.fn(async () => ({ ok: true, action: 'uninstall' as const, message: 'ok', daemonVersion: null })),
+    installService: vi.fn(async (): Promise<PrivilegedResult> => ({ ok: true, action: 'install', message: 'ok', daemonVersion: '0.1.0' })),
+    uninstallService: vi.fn(async (): Promise<PrivilegedResult> => ({ ok: true, action: 'uninstall', message: 'ok', daemonVersion: null })),
     exportDiagnostics: vi.fn(async () => '/tmp/diagnostics.txt')
   }
   window.dualVpn = api
@@ -146,13 +147,43 @@ describe('App', () => {
     api.installService.mockResolvedValue({
       ok: false,
       action: 'install',
-      message: '管理员操作未完成',
-      daemonVersion: null
+      message: '安装服务文件失败，原有网络配置已保留',
+      daemonVersion: null,
+      errorCode: 'service_files_failed'
     })
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: '安装后台服务' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('管理员操作未完成')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('安装服务文件失败，原有网络配置已保留')
+    expect(alert).toHaveTextContent('诊断日志')
+    fireEvent(document, new Event('visibilitychange'))
+    expect(await screen.findByRole('alert')).toBe(alert)
     expect(screen.queryByText('后台服务已安装')).not.toBeInTheDocument()
+  })
+
+  it('shows visible progress while administrator installation is running', async () => {
+    const api = mockApi(status('UNINSTALLED'))
+    let completeInstall: ((value: Awaited<ReturnType<typeof api.installService>>) => void) | undefined
+    api.installService.mockImplementation(() => new Promise((resolve) => { completeInstall = resolve }))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '安装后台服务' }))
+    expect(await screen.findByRole('button', { name: '正在安装后台服务…' })).toBeDisabled()
+
+    completeInstall?.({ ok: true, action: 'install', message: '后台服务已安装', daemonVersion: '0.1.0' })
+    expect(await screen.findByRole('status')).toHaveTextContent('后台服务已安装')
+  })
+
+  it('does not expose raw launcher errors in persistent feedback', async () => {
+    const api = mockApi(status('UNINSTALLED'))
+    api.installService.mockRejectedValue(new Error('spawn failed: /Users/alice/private password=secret'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '安装后台服务' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('安装请求未完成，请查看诊断信息')
+    expect(alert).not.toHaveTextContent('/Users/alice')
+    expect(alert).not.toHaveTextContent('secret')
   })
 })
