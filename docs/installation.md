@@ -21,24 +21,23 @@
 - 已安装并能正常登录中移 ZYZXVPN 和度管家。
 - 当前账号有 macOS 管理员授权；安装、升级和卸载后台服务时需要输入管理员密码。
 - 能访问公司办公网络，或已连接能访问百度办公网的网络环境。
-- 从获授权的 GitHub Releases 页面下载安装包，不使用聊天附件或来源不明的构建包。
+- 从项目公开的 GitHub Releases 页面下载安装包，不使用聊天附件或来源不明的构建包。
 
 如果电脑上安装过旧版 `baidu-mobile-dual-vpn` Skill 的自动分流服务，新助手会在安装后台服务时尝试安全迁移。不要同时手工运行旧 Skill 的安装脚本。
 
 ## 3. 下载和校验
 
-1. 登录获授权的 GitHub 账号。
-2. 打开私有仓库 `guofengming/dual-vpn-routing-assistant` 的 Releases。
-3. 下载以下两个文件：
+1. 打开公开的 [GitHub Releases 页面](https://github.com/guofengming/dual-vpn-routing-assistant/releases/latest)，无需登录 GitHub。
+2. 在最新版的 `Assets` 区域下载以下两个文件：
    - `双-VPN-分流助手-<版本>-universal.dmg`
    - `SHA256SUMS.txt`
-4. 在终端进入下载目录并运行：
+3. 在终端进入下载目录并运行：
 
    ```bash
    shasum -a 256 "双-VPN-分流助手-<版本>-universal.dmg"
    ```
 
-5. 确认输出与 `SHA256SUMS.txt` 中同名文件的校验值完全一致。
+4. 确认输出与 `SHA256SUMS.txt` 中同名文件的校验值完全一致。
 
 每个版本的校验值都可能不同，应以同一 Release 中的 `SHA256SUMS.txt` 为准。
 
