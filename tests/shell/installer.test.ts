@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { runDaemonScript } from '../helpers/run-daemon-script'
 
 describe('privileged service transaction', () => {
+  it('falls back to route change when restoring a legacy interface host route', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-interface-route', 'host', '10.57.0.96', 'utun4'],
+      'legacy-host-restore-add-failure'
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.operations).toEqual([
+      ['legacy-route-add', 'host', '10.57.0.96', 'utun4'],
+      ['legacy-route-change', 'host', '10.57.0.96', 'utun4']
+    ])
+  })
+
   it('does not claim a same-interface gateway host route during legacy migration', async () => {
     const result = await runDaemonScript(
       'migrate-legacy.sh',

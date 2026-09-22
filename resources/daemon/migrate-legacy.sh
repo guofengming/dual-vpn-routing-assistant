@@ -37,6 +37,22 @@ legacy_snapshot_for_target() {
   esac
 }
 
+legacy_route_interface_action() {
+  local action="$1" kind="$2" target="$3" original_if="$4"
+  if fixture_mode_enabled; then
+    print -r -- "operation=legacy-route-${action}|${kind}|${target}|${original_if}"
+    read_fixture fail-step.txt 2>/dev/null | /usr/bin/grep -Fxq "legacy-route-${action}-interface" && return 1
+    return 0
+  fi
+  /sbin/route -n "$action" "-${kind}" "$target" -interface "$original_if" >/dev/null 2>&1
+}
+
+legacy_restore_interface_route() {
+  local kind="$1" target="$2" original_if="$3"
+  legacy_route_interface_action add "$kind" "$target" "$original_if" ||
+    legacy_route_interface_action change "$kind" "$target" "$original_if"
+}
+
 legacy_restore_route() {
   local kind="$1" target="$2" snapshot="$3"
   [[ -s "$snapshot" ]] || return 0
@@ -52,7 +68,7 @@ legacy_restore_route() {
   if [[ "$original_flags" == *GATEWAY* && -n "$original_gw" ]]; then
     /sbin/route -n add "-${kind}" "$target" "$original_gw" >/dev/null 2>&1
   elif [[ -n "$original_if" ]]; then
-    /sbin/route -n add "-${kind}" "$target" -interface "$original_if" >/dev/null 2>&1
+    legacy_restore_interface_route "$kind" "$target" "$original_if"
   fi
 }
 
@@ -296,6 +312,11 @@ if [[ "${ZSH_EVAL_CONTEXT:-}" == toplevel ]]; then
       ;;
     --test-current-route-match)
       legacy_current_route_matches "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+      exit $?
+      ;;
+    --test-restore-interface-route)
+      fixture_mode_enabled || exit 64
+      legacy_restore_interface_route "${2:-}" "${3:-}" "${4:-}"
       exit $?
       ;;
   esac
