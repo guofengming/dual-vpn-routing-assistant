@@ -1,0 +1,5 @@
+   route to: default
+destination: default
+       mask: default
+    gateway: 172.19.132.1
+  interface: en0

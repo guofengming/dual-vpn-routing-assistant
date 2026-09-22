@@ -1,0 +1,52 @@
+{
+  "name": "dual-vpn-routing-assistant",
+  "version": "0.1.0",
+  "description": "macOS 双 VPN 分流、检测与自动恢复助手",
+  "author": "guofengming",
+  "homepage": "https://github.com/guofengming/dual-vpn-routing-assistant",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "dist:mac": "electron-vite build && electron-builder --mac --universal --publish never",
+    "verify": "tsc --noEmit && eslint . && vitest run && electron-vite build"
+  },
+  "dependencies": {
+    "lucide-react": "1.47.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "jsdom": "30.1.1",
+    "prettier": "3.9.8",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}

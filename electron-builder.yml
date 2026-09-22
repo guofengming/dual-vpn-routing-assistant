@@ -1,0 +1,25 @@
+appId: com.guofengming.dual-vpn-routing-assistant
+productName: 双 VPN 分流助手
+asar: true
+compression: maximum
+files:
+  - out/**
+extraResources:
+  - from: resources/daemon
+    to: daemon
+mac:
+  category: public.app-category.utilities
+  icon: build/icon.icns
+  minimumSystemVersion: "13.0"
+  identity: null
+  target:
+    - target: dmg
+      arch:
+        - universal
+dmg:
+  artifactName: 双-VPN-分流助手-${version}-${arch}.${ext}
+  title: 双 VPN 分流助手 ${version}
+  writeUpdateInfo: false
+directories:
+  output: dist
+  buildResources: build
