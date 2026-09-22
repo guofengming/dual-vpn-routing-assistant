@@ -1,0 +1,5 @@
+   route to: 10.57.0.96
+destination: 10.57.0.96
+    gateway: 10.57.4.1
+  interface: utun6
+      flags: <UP,GATEWAY,HOST,DONE,STATIC>

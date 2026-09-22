@@ -54,6 +54,19 @@ interface_has_address() {
   print -r -- "$output" | /usr/bin/grep -qE '^[[:space:]]+inet6? '
 }
 
+interface_has_ipv4_address() {
+  local interface_name="$1"
+  local output
+
+  if fixture_mode_enabled; then
+    output="$(read_fixture "ifconfig-${interface_name}.txt" 2>/dev/null)" || return 1
+  else
+    output="$(/sbin/ifconfig "$interface_name" 2>/dev/null)" || return 1
+  fi
+
+  print -r -- "$output" | /usr/bin/grep -qE '^[[:space:]]+inet '
+}
+
 route_get() {
   local target="$1"
   if fixture_mode_enabled && [[ "$target" == default ]]; then

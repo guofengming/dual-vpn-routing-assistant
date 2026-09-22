@@ -1,0 +1,2 @@
+utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380
+	inet6 fe80::1c6d:8064:8af1:8ebc%utun4 prefixlen 64 scopeid 0x16

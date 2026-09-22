@@ -11,6 +11,7 @@
 - 为 `baidu.com`、`baidu-int.com`、`internal.baidu.com` 配置受控的补充 DNS。
 - 网络变化时先撤销旧配置，等待稳定后再应用，避免旧网关或旧 `utun` 残留。
 - 支持暂停、恢复、立即检测修复、随系统自动启用、结构化诊断和安全卸载。
+- 提供 macOS 菜单栏图标，可快速打开窗口、查看状态、检测修复和暂停或恢复分流。
 
 本应用不会启动、关闭、登录或自动操作 ZYZXVPN、度管家、AccessClient、VMware Horizon；这些应用始终由用户自己控制。
 

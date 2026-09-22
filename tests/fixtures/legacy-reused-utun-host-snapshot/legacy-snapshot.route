@@ -1,0 +1,6 @@
+   route to: 10.57.0.96
+destination: 10.57.0.96
+  interface: utun4
+      flags: <UP,HOST,DONE,IFSCOPE>
+ recvpipe  sendpipe  ssthresh  rtt,msec    rttvar  hopcount      mtu     expire
+       0         0         0         0         0         0      1400         0

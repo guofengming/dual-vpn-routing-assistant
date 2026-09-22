@@ -1,9 +1,10 @@
-# v0.1.2 发布验证清单
+# v0.2.0 发布验证清单
 
 - [x] TypeScript 类型检查
 - [x] ESLint
 - [x] Vitest 单元/脚本测试
 - [x] Electron Playwright 窗口测试（当前 Apple Silicon 开发机）
+- [x] 菜单栏图标、窗口隐藏/恢复和快捷操作测试
 - [x] Universal DMG 构建与 `arm64 x86_64` 检查
 - [x] Universal 架构、最低系统版本与后台资源完整性检查
 - [x] DMG 内 App 与本地打包 App 逐文件一致

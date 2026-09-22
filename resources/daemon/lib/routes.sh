@@ -314,7 +314,7 @@ route_snapshot_is_restorable() {
   original_gw="$(field_from_route "$output" gateway)"
   original_flags="$(field_from_route "$output" flags)"
   [[ -n "$original_if" ]] || return 1
-  interface_has_address "$original_if" || return 1
+  interface_has_ipv4_address "$original_if" || return 1
   if [[ "$original_flags" == *GATEWAY* ]]; then
     [[ -n "$original_gw" ]] || return 1
     gateway_if="$(field_from_route "$(route_get "$original_gw")" interface)"
@@ -613,5 +613,10 @@ fi
 
 if [[ "${1:-}" == --test-snapshot-policy ]]; then
   route_output_is_exact "${2:-}" "${3:-}" "$(read_fixture "${4:-}" 2>/dev/null)"
+  exit $?
+fi
+
+if [[ "${1:-}" == --test-snapshot-restorable ]]; then
+  route_snapshot_is_restorable "$(fixture_path "${2:-}")"
   exit $?
 fi

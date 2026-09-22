@@ -1,6 +1,6 @@
 {
   "name": "dual-vpn-routing-assistant",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "macOS 双 VPN 分流、检测与自动恢复助手",
   "author": "guofengming",
   "homepage": "https://github.com/guofengming/dual-vpn-routing-assistant",

@@ -3,6 +3,16 @@ import { runRouteScenario } from '../helpers/run-daemon-script'
 import { runDaemonScript } from '../helpers/run-daemon-script'
 
 describe('owned route transaction', () => {
+  it('does not restore an IPv4 snapshot through an interface with only IPv6', async () => {
+    const result = await runDaemonScript(
+      'lib/routes.sh',
+      ['--test-snapshot-restorable', 'stale-host.route'],
+      'route-snapshot-ipv6-only'
+    )
+
+    expect(result.exitCode).not.toBe(0)
+  })
+
   it('adds only two /9 routes and two mobile DNS host routes', async () => {
     const result = await runRouteScenario('apply-active')
 

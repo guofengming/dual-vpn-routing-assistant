@@ -1,11 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeImage,
+  Tray,
+  type BrowserWindowConstructorOptions
+} from 'electron'
 import { z } from 'zod'
 import { DaemonClient } from './daemon-client'
 import { exportDiagnosticBundle } from './diagnostics'
 import { runPrivilegedAction } from './privileged-action'
+import type { ControlRequest, DaemonStatus } from '../shared/protocol'
+import { createTrayIcon, handleWindowClose, MenuBarController } from './tray'
 
 export const IPC_CHANNELS = [
   'dual-vpn:get-app-version',
@@ -21,6 +31,15 @@ export const IPC_CHANNELS = [
 
 const BooleanSchema = z.boolean()
 const LogLevelSchema = z.enum(['standard', 'detailed'])
+
+export interface DaemonControlClient {
+  readStatus(): Promise<DaemonStatus>
+  send(request: ControlRequest): Promise<void>
+}
+
+let mainWindow: BrowserWindow | null = null
+let menuBarController: MenuBarController | null = null
+let isQuitting = false
 
 export function createWindowOptions(preloadPath: string): BrowserWindowConstructorOptions {
   return {
@@ -71,7 +90,7 @@ export function createDaemonClient(): DaemonClient {
   return new DaemonClient()
 }
 
-export function registerIpcHandlers(client = createDaemonClient()): void {
+export function registerIpcHandlers(client: DaemonControlClient = createDaemonClient()): void {
   ipcMain.handle('dual-vpn:get-app-version', () => app.getVersion())
   ipcMain.handle('dual-vpn:get-status', () => client.readStatus())
   ipcMain.handle('dual-vpn:repair-now', () => client.send({
@@ -123,12 +142,57 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   return window
 }
 
-async function startApplication(): Promise<void> {
+async function showMainWindow(): Promise<void> {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = await createMainWindow()
+    mainWindow.on('close', (event) => handleWindowClose(event, mainWindow!, isQuitting))
+    mainWindow.on('closed', () => { mainWindow = null })
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+export async function startApplication(
+  client: DaemonControlClient = createDaemonClient()
+): Promise<void> {
   await app.whenReady()
-  registerIpcHandlers()
-  await createMainWindow()
+  isQuitting = false
+  app.on('before-quit', () => { isQuitting = true })
+  app.on('will-quit', () => {
+    menuBarController?.dispose()
+    menuBarController = null
+  })
+  registerIpcHandlers(client)
+  await showMainWindow()
+
+  const tray = new Tray(createTrayIcon(nativeImage))
+  menuBarController = new MenuBarController({
+    tray,
+    buildMenu: (template) => Menu.buildFromTemplate(template),
+    readStatus: () => client.readStatus(),
+    actions: {
+      showWindow: () => { void showMainWindow() },
+      repairNow: () => client.send({
+        ...requestBase(),
+        type: 'repairNow'
+      }),
+      setPaused: (value) => client.send({
+        ...requestBase(),
+        type: 'setPaused',
+        value
+      }),
+      quit: () => app.quit()
+    },
+    scheduleRefresh: (refresh) => {
+      const interval = setInterval(refresh, 5_000)
+      return () => clearInterval(interval)
+    }
+  })
+  await menuBarController.start()
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) void createMainWindow()
+    void showMainWindow()
   })
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()

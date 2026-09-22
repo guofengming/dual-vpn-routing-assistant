@@ -4,6 +4,7 @@ set -u
 typeset -gr MIGRATE_SCRIPT_PATH="${(%):-%N}"
 typeset -gr MIGRATE_DIR="${MIGRATE_SCRIPT_PATH:A:h}"
 source "${MIGRATE_DIR}/lib/common.sh"
+source "${MIGRATE_DIR}/lib/probe.sh"
 
 typeset -gr LEGACY_LABEL="com.openai.baidu-mobile-dual-vpn"
 typeset -gr LEGACY_PLIST="/Library/LaunchDaemons/${LEGACY_LABEL}.plist"
@@ -53,6 +54,27 @@ legacy_restore_interface_route() {
     legacy_route_interface_action change "$kind" "$target" "$original_if"
 }
 
+legacy_snapshot_is_restorable() {
+  local kind="$1" snapshot="$2" output original_if original_gw original_flags gateway_if current_mobile
+  [[ -s "$snapshot" ]] || return 1
+  output="$(<"$snapshot")"
+  original_if="$(field_from_route "$output" interface)"
+  original_gw="$(field_from_route "$output" gateway)"
+  original_flags="$(field_from_route "$output" flags)"
+  [[ -n "$original_if" ]] || return 1
+  interface_has_ipv4_address "$original_if" || return 1
+  if [[ "$kind" == host ]]; then
+    [[ "$original_if" == utun<-> ]] || return 1
+    current_mobile="$(probe_mobile_interface "$(detect_console_user)")"
+    [[ -n "$current_mobile" && "$original_if" == "$current_mobile" ]] || return 1
+  fi
+  if [[ "$original_flags" == *GATEWAY* ]]; then
+    [[ -n "$original_gw" ]] || return 1
+    gateway_if="$(field_from_route "$(route_get "$original_gw")" interface)"
+    [[ "$gateway_if" == "$original_if" ]] || return 1
+  fi
+}
+
 legacy_restore_route() {
   local kind="$1" target="$2" snapshot="$3"
   [[ -s "$snapshot" ]] || return 0
@@ -63,8 +85,12 @@ legacy_restore_route() {
   original_if="$(field_from_route "$output" interface)"
   original_gw="$(field_from_route "$output" gateway)"
   original_flags="$(field_from_route "$output" flags)"
-  [[ -z "$original_if" || "$original_if" == [a-zA-Z][a-zA-Z0-9]## ]] || return 1
+  [[ -z "$original_if" || "$original_if" =~ "^[A-Za-z][A-Za-z0-9]*$" ]] || return 1
   [[ -z "$original_gw" || "$original_gw" == <->.<->.<->.<-> ]] || return 1
+  if ! legacy_snapshot_is_restorable "$kind" "$snapshot"; then
+    safe_log info "legacy snapshot stale target=${target} interface=${original_if:-none}"
+    return 0
+  fi
   if [[ "$original_flags" == *GATEWAY* && -n "$original_gw" ]]; then
     /sbin/route -n add "-${kind}" "$target" "$original_gw" >/dev/null 2>&1
   elif [[ -n "$original_if" ]]; then
@@ -86,18 +112,43 @@ legacy_current_route_matches() {
   [[ "$kind" != host || "$flags" != *GATEWAY* ]]
 }
 
+legacy_current_mobile_owns_route() {
+  local kind="$1" target="$2" current="$3" console_user mobile_if current_if flags
+  [[ "$kind" == host ]] || return 1
+  legacy_route_output_is_exact "$kind" "$target" "$current" || return 1
+  flags="$(field_from_route "$current" flags)"
+  [[ "$flags" != *GATEWAY* ]] || return 1
+  console_user="$(detect_console_user)"
+  mobile_if="$(probe_mobile_interface "$console_user")"
+  [[ -n "$mobile_if" ]] || return 1
+  interface_has_ipv4_address "$mobile_if" || return 1
+  current_if="$(field_from_route "$current" interface)"
+  [[ "$current_if" == "$mobile_if" ]]
+}
+
 legacy_route_matches_snapshot() {
   local kind="$1" target="$2" snapshot="$3"
   local current
-  current="$(route_get "$target")"
+  if fixture_mode_enabled; then
+    current="$(read_fixture legacy-restored-route.txt 2>/dev/null || true)"
+  else
+    current="$(route_get "$target")"
+  fi
   if [[ ! -s "$snapshot" ]] || ! legacy_route_output_is_exact "$kind" "$target" "$(<"$snapshot")"; then
+    ! legacy_route_output_is_exact "$kind" "$target" "$current"
+    return
+  fi
+  if ! legacy_snapshot_is_restorable "$kind" "$snapshot"; then
+    if legacy_current_mobile_owns_route "$kind" "$target" "$current"; then
+      safe_log info "current mobile VPN recreated legacy target=${target} interface=$(field_from_route "$current" interface)"
+      return 0
+    fi
     ! legacy_route_output_is_exact "$kind" "$target" "$current"
     return
   fi
   local expected field expected_value
   expected="$(<"$snapshot")"
   [[ "$expected" == *"route to:"* ]] || return 0
-  current="$(route_get "$target")"
   for field in interface gateway destination mask; do
     expected_value="$(field_from_route "$expected" "$field")"
     [[ -z "$expected_value" || "$(field_from_route "$current" "$field")" == "$expected_value" ]] || return 1
@@ -318,6 +369,16 @@ if [[ "${ZSH_EVAL_CONTEXT:-}" == toplevel ]]; then
       fixture_mode_enabled || exit 64
       legacy_restore_interface_route "${2:-}" "${3:-}" "${4:-}"
       exit $?
+      ;;
+    --test-restore-route)
+      fixture_mode_enabled || exit 64
+      snapshot="$(fixture_path legacy-snapshot.route)" || exit 1
+      if legacy_restore_route "${2:-}" "${3:-}" "$snapshot" && \
+         legacy_route_matches_snapshot "${2:-}" "${3:-}" "$snapshot"; then
+        print -r -- "restore_result=verified"
+        exit 0
+      fi
+      exit 1
       ;;
   esac
 fi

@@ -2,6 +2,78 @@ import { describe, expect, it } from 'vitest'
 import { runDaemonScript } from '../helpers/run-daemon-script'
 
 describe('privileged service transaction', () => {
+  it('accepts a live legacy utun interface from a trusted route snapshot', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun4'],
+      'legacy-live-host-snapshot'
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.operations).toEqual([
+      ['legacy-route-add', 'host', '10.57.0.96', 'utun4']
+    ])
+    expect(result.stdout).toContain('restore_result=verified')
+  })
+
+  it('treats a legacy host snapshot on a disconnected utun as stale', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun6'],
+      'legacy-stale-host-snapshot'
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.operations).toEqual([])
+    expect(result.stdout).toContain('restore_result=verified')
+  })
+
+  it('accepts a stale legacy host snapshot when the current mobile VPN recreates the route', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun6'],
+      'legacy-stale-host-current-mobile-takeover'
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.operations).toEqual([])
+    expect(result.stdout).toContain('restore_result=verified')
+  })
+
+  it('does not restore a legacy host snapshot through a utun name reused by another VPN', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun6'],
+      'legacy-reused-utun-host-snapshot'
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.operations).toEqual([])
+    expect(result.stdout).toContain('restore_result=verified')
+  })
+
+  it('rejects a recreated legacy host route on a non-mobile utun', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun6'],
+      'legacy-stale-host-other-utun-takeover'
+    )
+
+    expect(result.exitCode).not.toBe(0)
+    expect(result.operations).toEqual([])
+  })
+
+  it('rejects a recreated gateway host route on the current mobile utun', async () => {
+    const result = await runDaemonScript(
+      'migrate-legacy.sh',
+      ['--test-restore-route', 'host', '10.57.0.96', 'utun6'],
+      'legacy-stale-host-gateway-takeover'
+    )
+
+    expect(result.exitCode).not.toBe(0)
+    expect(result.operations).toEqual([])
+  })
+
   it('falls back to route change when restoring a legacy interface host route', async () => {
     const result = await runDaemonScript(
       'migrate-legacy.sh',
