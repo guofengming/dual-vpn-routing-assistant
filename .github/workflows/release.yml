@@ -52,6 +52,5 @@ jobs:
         with:
           files: |
             dist/*-universal.dmg
-            dist/SHA256SUMS.txt
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -35,6 +35,4 @@ done
 /usr/bin/plutil -extract Label raw -o - "${RESOURCES_DIR}/com.guofengming.dual-vpn-routing-assistant.plist" | \
   /usr/bin/grep -qx com.guofengming.dual-vpn-routing-assistant
 
-checksum_file="${DMG_PATH:h}/SHA256SUMS.txt"
-(cd "${DMG_PATH:h}" && /usr/bin/shasum -a 256 "${DMG_PATH:t}") >| "$checksum_file"
-print -r -- "verified universal app (${architectures}); checksum: ${checksum_file}"
+print -r -- "verified universal app (${architectures})"

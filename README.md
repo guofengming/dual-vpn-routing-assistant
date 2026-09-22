@@ -16,7 +16,7 @@
 
 ## 下载与安装
 
-仓库已公开，无需登录 GitHub。请从 [最新 Release](https://github.com/guofengming/dual-vpn-routing-assistant/releases/latest) 下载 `双-VPN-分流助手-<版本>-universal.dmg` 和 `SHA256SUMS.txt`。安装、首次启用、切网处理、升级和卸载步骤见 [完整使用说明](docs/installation.md)。
+仓库已公开，无需登录 GitHub。请从 [最新 Release](https://github.com/guofengming/dual-vpn-routing-assistant/releases/latest) 下载 `双-VPN-分流助手-<版本>-universal.dmg`。安装、首次启用、旧 Skill 迁移、切网处理、升级和卸载步骤见 [完整使用说明](docs/installation.md)。
 
 首版为无签名、未公证构建，第一次打开需在“系统设置 → 隐私与安全性”中确认。第一次安装后台服务和卸载服务时会请求管理员密码；日常自动恢复不再请求密码。
 

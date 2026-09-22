@@ -2,7 +2,7 @@
 
 - 日期：2026-09-22
 - 状态：用户已确认，已实现
-- 目标仓库：`guofengming/dual-vpn-routing-assistant`（GitHub 私有仓库）
+- 目标仓库：`guofengming/dual-vpn-routing-assistant`（GitHub 公开仓库）
 - 目标平台：macOS 13 及以上，Apple Silicon 与 Intel
 
 ## 1. 背景
@@ -30,7 +30,7 @@
 4. 中移 VPN 未连接时安静等待，不写无效路由，不持续打印错误。
 5. 提供暂停、恢复、立即检测并修复、诊断日志和开机自动分流设置。
 6. 首次安装后日常操作无需管理员密码。
-7. 生成可供同事下载的 macOS 通用 `.dmg`，并通过私有 GitHub Releases 分发。
+7. 生成可供同事下载的 macOS 通用 `.dmg`，并通过公开 GitHub Releases 分发。
 
 ### 2.2 非目标
 
@@ -341,11 +341,11 @@ plist 中的接口名只能作为候选。正式使用前必须验证：
 
 ### 10.3 GitHub
 
-- 私有仓库：`guofengming/dual-vpn-routing-assistant`；
+- 公开仓库：`guofengming/dual-vpn-routing-assistant`；
 - tag 格式：`v<major>.<minor>.<patch>`；
 - GitHub Actions 在 macOS runner 上执行测试和 Universal 构建；
-- Release 附件包含 `.dmg`、`SHA256SUMS.txt` 和简短安装说明；
-- 私有仓库成员登录 GitHub 后下载；
+- Release 附件包含 Universal `.dmg`，安装说明由仓库文档提供；
+- 用户无需登录 GitHub 即可下载；
 - 首版没有签名证书，因此 workflow 不配置签名或公证 secrets。
 
 ## 11. 测试策略
@@ -403,6 +403,6 @@ plist 中的接口名只能作为候选。正式使用前必须验证：
 - 网络切换、VPN 断线和 stale plist 不会产生无限重试；
 - 暂停和卸载不会遗留本应用创建的路由或 DNS；
 - App 界面符合已确认的导航式布局与“深空蓝 · 精密仪表”视觉方向；
-- 构建产生 Universal `.dmg` 和 SHA-256 校验文件；
-- 私有 GitHub Release 可供授权同事下载；
+- 构建产生并验证 Universal `.dmg`；
+- 公开 GitHub Release 可供用户直接下载；
 - 安装、允许未签名 App、使用和卸载说明完整。

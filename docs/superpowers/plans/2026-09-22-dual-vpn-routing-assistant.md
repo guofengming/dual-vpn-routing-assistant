@@ -26,7 +26,7 @@
 
 ```text
 dual-vpn-routing-assistant/
-├── .github/workflows/release.yml             # test, universal build, checksum, private release
+├── .github/workflows/release.yml             # test, Universal build, public release
 ├── build/icon.icns                            # generated app icon
 ├── docs/
 │   ├── installation.md                       # unsigned app installation and removal guide
@@ -805,8 +805,8 @@ Do not execute this step without explicit user authorization.
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces: `dist/双 VPN 分流助手-<version>-universal.dmg` and `dist/SHA256SUMS.txt`.
-- Produces private GitHub Release on `v*` tags.
+- Produces: `dist/双 VPN 分流助手-<version>-universal.dmg`.
+- Produces a public GitHub Release on `v*` tags.
 - Consumes the complete app and daemon resource tree.
 
 - [ ] **Step 1: Configure electron-builder**
@@ -841,17 +841,17 @@ Explicitly disable identity autodiscovery so the first release remains unsigned.
 /usr/bin/lipo -archs "双 VPN 分流助手.app/Contents/MacOS/双 VPN 分流助手"
 ```
 
-Require both `x86_64` and `arm64`. Also verify all daemon scripts, plist, version file, app ID, and minimum system version are present. Compute SHA-256 with `/usr/bin/shasum -a 256`.
+Require both `x86_64` and `arm64`. Also verify all daemon scripts, plist, version file, app ID, and minimum system version are present.
 
 - [ ] **Step 3: Add GitHub Actions release workflow**
 
-On pull requests and pushes, run `pnpm install --frozen-lockfile`, `pnpm run verify`, and shell tests on both `macos-15` (Apple Silicon) and `macos-15-intel` (Intel). On `v*` tags, build `pnpm run dist:mac`, verify the Universal binary, generate `SHA256SUMS.txt`, and publish both files with `softprops/action-gh-release@v2` using the repository `GITHUB_TOKEN`.
+On pull requests and pushes, run `pnpm install --frozen-lockfile`, `pnpm run verify`, and shell tests on both `macos-15` (Apple Silicon) and `macos-15-intel` (Intel). On `v*` tags, build `pnpm run dist:mac`, verify the Universal binary, and publish the DMG with `softprops/action-gh-release@v2` using the repository `GITHUB_TOKEN`.
 
 - [ ] **Step 4: Write installation and recovery documentation**
 
 Document:
 
-- downloading from a private Release;
+- downloading from the public Release;
 - dragging the App to Applications;
 - allowing an unsigned app in Privacy & Security;
 - first administrator authorization;
@@ -871,7 +871,7 @@ pnpm run dist:mac
 scripts/verify-universal.sh dist/*.dmg
 ```
 
-Expected: all tests pass; DMG exists; `lipo` reports `x86_64 arm64`; checksum file matches.
+Expected: all tests pass; DMG exists; `lipo` reports `x86_64 arm64`; packaged resources and minimum macOS version match the release contract.
 
 - [ ] **Step 6: Perform Apple Silicon smoke test**
 
@@ -897,7 +897,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Create `guofengming/dual-vpn-routing-assistant` as a private repository only at this approval gate if it does not already exist. The pushed tag starts the private GitHub Release workflow.
+Create `guofengming/dual-vpn-routing-assistant` only at this approval gate if it does not already exist. The pushed tag starts the public GitHub Release workflow.
 
 Do not execute any command in this step without explicit user authorization.
 
